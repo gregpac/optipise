@@ -193,7 +193,10 @@ void loop(void)
 { 
 Serial.println("--------------- CAPTEURS ---------------");
   
- digitalWrite(RADIOLED, HIGH); //Green LED is on while gathering data from sensors 
+ digitalWrite(RADIOLED, HIGH); //Green LED flashes before gathering data from sensors 
+ delay (10);
+ digitalWrite(RADIOLED, LOW);
+ 
   
 // temperature et humidite
 #if TH==1
@@ -340,6 +343,8 @@ Serial.println();
  emontx.distance = distance_cm;
 #endif
 
+ digitalWrite(RADIOLED, HIGH); //Green LED flashes after gathering data from sensors 
+ delay (10);
 digitalWrite(RADIOLED, LOW);
 delay(TEMPO);
 
