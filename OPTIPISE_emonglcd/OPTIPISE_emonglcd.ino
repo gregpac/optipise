@@ -16,13 +16,12 @@
 #define GREENLED 6
 typedef struct 
 { 
-  float celciusIR;  
+  int celciusIR;  
   int luminosite;
   int presence;
   int temperature;
   int humidite;
-  float pression;
-  long distance;
+  int pression;
 } PayloadTX ;      // create structure - a neat way of packaging data for RF comms
 
 PayloadTX emontx;  
@@ -39,6 +38,7 @@ char chaine4[22];
 char chaine5[22];
 char chaine6[22];
 char chaine7[22];
+char chaine8[22];
 
 int tempIR;
 int tempdecIR;
@@ -49,13 +49,11 @@ int humdec;
 int pressi;
 int pressidec;
 
-#define IR 0
+#define IR 1
 #define TH 1
 #define LUM 1
-#define PRESENCE 0
-#define PRESSION 0
-#define DIST 0
-
+#define PRESENCE 1
+#define PRESSION 1
 
 
 void setup(void)
@@ -111,7 +109,7 @@ digitalWrite(GREENLED, LOW);
 
 
 #if IR==1
-Serial.print("temperature IR: ");Serial.println(emontx.celciusIR);
+Serial.print("temperature IR: ");Serial.println(emontx.celciusIR/100);
 #endif
 #if LUM==1
 Serial.print("luminosite: ");Serial.println(emontx.luminosite);
@@ -124,66 +122,75 @@ Serial.print("temperature: ");Serial.println(emontx.temperature/100);
 Serial.print("humidite: ");Serial.println(emontx.humidite/100);
 #endif
 #if PRESSION==1
-Serial.print("pression: ");Serial.println(emontx.pression);
+Serial.print("pression HPa: ");Serial.println(emontx.pression/10);
 #endif
-#if DIST==1
-Serial.print("distance: ");Serial.println(emontx.distance);
-#endif
+
 Serial.println();
   }
  }
 }
+sprintf(chaine1, "OPTIPISE radiocheck");
+sprintf(chaine2, "---------------------");
 
 // Affichage EmonGLCD
 #if IR==1
-  tempIR = (int)emontx.celciusIR;
-  tempdecIR = (emontx.celciusIR)*100 - tempIR*100;
-  sprintf(chaine1, "temperature IR: %d,%2d", tempIR, tempdecIR);
-  else sprintf(chaine1, "temperature IR : erreur");
+  if (emontx.celciusIR<-50)
+  {sprintf(chaine3, "IR : erreur");}
+  else
+ { tempIR=int(emontx.celciusIR/100);
+  tempdecIR=int(emontx.celciusIR)-tempIR*100;
+  sprintf(chaine3, "IR: %d,%2d", tempIR, tempdecIR);}
 #endif
 #if LUM==1
-  sprintf(chaine2, "luminosite: %d", emontx.luminosite);
+  sprintf(chaine4, "luminosite: %d", emontx.luminosite);
 #endif
 #if PRESENCE==1
-  sprintf(chaine3, "presence: %d", emontx.presence);
+  sprintf(chaine5, "presence: %d", emontx.presence);
 #endif
 #if TH==1
-  temp = (int)emontx.temperature/100;
+  if (emontx.temperature < -70)
+  {sprintf(chaine6, "temperature : erreur");}
+  else
+  {temp = int(emontx.temperature/100);
   tempdec = (emontx.temperature) - temp*100;
-  sprintf(chaine4, "temperature: %d,%2d", temp, tempdec);
-  hum = (int)emontx.humidite/100;
+  sprintf(chaine6, "temperature: %d,%2d", temp, tempdec);}
+ 
+  if (emontx.humidite<=0)
+  {sprintf(chaine7, "humidite : erreur");}
+  else
+  {hum = int(emontx.humidite/100);
   humdec = (emontx.humidite) - hum*100;
-  sprintf(chaine5, "humidite: %d,%2d", hum, humdec);
+  sprintf(chaine7, "humidite: %d,%2d", hum, humdec);}
 #endif
 #if PRESSION==1
-  pressi = (int)emontx.pression;
-  pressidec = (emontx.pression)*100 - pressi*100;
-  sprintf(chaine6, "pression: %d,%2d", pressi, pressidec);
+  pressi = int(emontx.pression/10);
+  pressidec = int(emontx.pression) - pressi*10;
+  sprintf(chaine8, "pression: %d,%2d", pressi, pressidec);
 #endif
-#if DIST==1
-  sprintf(chaine7, "distance: %d", emontx.distance);
-#endif
+
             
     // draw a string at a location, use _p variant to reduce RAM use
 
   glcd.drawString(0,  0, chaine1);
-
-#if LUM==1
   glcd.drawString(0,  8, chaine2);
-#endif
-#if PRESENCE==1
+
+#if IR==1
   glcd.drawString(0,  16, chaine3);
 #endif
-#if TH==1
-  glcd.drawString(0,  24,  chaine4);
+#if LUM==1
+  glcd.drawString(0,  24, chaine4);
+#endif
+#if PRESENCE==1
   glcd.drawString(0,  32, chaine5);
 #endif
-#if PRESSION==1
-  glcd.drawString(0,  40, chaine6);
-#endif
-#if DIST==1
+#if TH==1
+  glcd.drawString(0,  40,  chaine6);
   glcd.drawString(0,  48, chaine7);
 #endif
+#if PRESSION==1
+  glcd.drawString(0,  56, chaine8);
+#endif
+
 
   glcd.refresh();
   glcd.clear();

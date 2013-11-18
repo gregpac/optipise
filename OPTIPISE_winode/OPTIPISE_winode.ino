@@ -33,11 +33,6 @@ DHT22 myDHT22(DHT22_PIN);
 // presence
 #define PIN_PRES 3
 
-// distance
-#define CM 1      //Centimeter
-#define INC 0     //Inch
-#define TP 8      //Trig_pin
-#define EP 9      //Echo_pin
 
 // microSD
 //Sd2Card card;
@@ -55,13 +50,12 @@ String dataString;
 
 typedef struct 
 { 
-  float celciusIR; 
+  int celciusIR; 
   int luminosite;
   int presence;
   int temperature;
   int humidite;
-  float pression;
-  long distance;
+  int pression;
 } PayloadTX ;      // create structure - a neat way of packaging data for RF comms
 
 PayloadTX emontx; 
@@ -71,15 +65,14 @@ PayloadTX emontx;
 #define WRITE_SD 0
 #define READ_SD 0
 #define TEMPO 2000 // attention: 2s minimum (pour DHT22) > 1000 minimum
-#define IR 0
+#define IR 1
 #define TH 1
 #define LUM 1
-#define PRESENCE 0
-#define PRESSION 0
-#define DIST 0
+#define PRESENCE 1
+#define PRESSION 1
 
 // nombre de données
-int N = IR + 2*TH + LUM + PRESENCE + PRESSION + DIST ; 
+int N = IR + 2*TH + LUM + PRESENCE + PRESSION ; 
 
 int tempIR;
 int tempdecIR;
@@ -91,6 +84,8 @@ int pressi;
 int pressidec;
 float DHTtemperature;
 float DHThumidite;
+float IRtemperature;
+float BMPpression;
 
 void setup(void)
 {
@@ -121,12 +116,6 @@ lum_setup();
 // presence
 #if PRESENCE==1
 presence_setup(); // interruption 1 enable
-#endif
-
-// distance
-#if DIST==1
-  pinMode(TP,OUTPUT);       // set TP output for trigger  
-  pinMode(EP,INPUT);        // set EP input for echo
 #endif
 
 delay(TEMPO);
@@ -309,19 +298,12 @@ Serial.println("--------------- CAPTEURS ---------------");
   delay(TEMPO);
 #endif
     
-// distance
-#if DIST==1
-  long microseconds = TP_init();
-  long distance_cm = Distance(microseconds, CM);
-  Serial.print("Distance_CM = ");
-  Serial.println(distance_cm);
-  delay(TEMPO);
-#endif
     
 Serial.println(); 
 
 #if IR==1  
- emontx.celciusIR = ir.celcius; 
+ IRtemperature = ir.celcius;
+ emontx.celciusIR = int(IRtemperature*100); 
 #endif
 #if LUM==1
  emontx.luminosite = lum.photocellReading;
@@ -333,15 +315,15 @@ Serial.println();
 #if TH==1
  DHTtemperature = myDHT22.getTemperatureC();
  DHThumidite = myDHT22.getHumidity();
- emontx.temperature = abs(DHTtemperature)*100;
- emontx.humidite = abs(DHThumidite)*100;
+ emontx.temperature = int(DHTtemperature*100);
+ emontx.humidite = int(DHThumidite*100);
 #endif
 #if PRESSION==1
- emontx.pression = bmp.readPressure();
+BMPpression = bmp.readPressure();
+emontx.pression = int(BMPpression/10);
+
 #endif
-#if DIST==1
- emontx.distance = distance_cm;
-#endif
+
 
  digitalWrite(RADIOLED, HIGH); //Green LED flashes after gathering data from sensors 
  delay (10);
@@ -357,10 +339,10 @@ delay(TEMPO);
 #endif
 
 #if IR==1
-  tempIR = (int)emontx.celciusIR;
+  tempIR = emontx.celciusIR/100;
   reccord_sd(tempIR);
   
-  tempdecIR = (emontx.celciusIR)*100 - tempIR*100;
+  tempdecIR = emontx.celciusIR - tempIR*100;
   reccord_sd(tempdecIR);
 #endif
 
@@ -383,16 +365,13 @@ delay(TEMPO);
 #endif
 
 #if PRESSION==1
-  pressi = (int)emontx.pression;
+  pressi = int(BMPpression/100);
   reccord_sd(pressi);
   
-  pressidec = (emontx.pression)*100 - pressi*100;
+  pressidec = int(BMPpression)-pressi;
   reccord_sd(pressidec);
 #endif
 
-#if DIST==1
-reccord_sd(emontx.distance);
-#endif
 
   Serial.println();
 
@@ -442,7 +421,7 @@ Serial.println("--------------- RADIO ---------------");
   rf12_sendStart(0, &emontx, sizeof emontx);
 
 #if IR==1
-Serial.print("temperature IR: ");Serial.println(emontx.celciusIR);
+Serial.print("temperature IR*100: ");Serial.println(emontx.celciusIR);
 #endif
 #if LUM==1
 Serial.print("luminosite: ");Serial.println(emontx.luminosite);
@@ -455,11 +434,9 @@ Serial.print("temperature*100: ");Serial.println(emontx.temperature);
 Serial.print("humidite*100: ");Serial.println(emontx.humidite);
 #endif
 #if PRESSION==1
-Serial.print("pression: ");Serial.println(emontx.pression);
+Serial.print("pression*10 : ");Serial.println(emontx.pression);
 #endif
-#if DIST==1
-Serial.print("distance: ");Serial.println(emontx.distance);
-#endif
+
 Serial.println();
 
 //LED blinks twice when sending data with RFM12B 
@@ -476,31 +453,6 @@ digitalWrite(RADIOLED, LOW);
 #endif
 }
 
-// HC_SR04
-#if DIST==1
-long Distance(long time, int flag)
-{
-  long distance;
-  if(flag)
-    distance = time /29 / 2  ;     // Distance_CM  = ((Duration of high level)*(Sonic :340m/s))/2
-                                   //              = ((Duration of high level)*(Sonic :0.034 cm/us))/2
-                                   //              = ((Duration of high level)/(Sonic :29.4 cm/us))/2
-  else
-    distance = time / 74 / 2;      // INC
-  return distance;
-}
-
-long TP_init()
-{                     
-  digitalWrite(TP, LOW);                    
-  delayMicroseconds(2);
-  digitalWrite(TP, HIGH);                 // pull the Trig pin to high level for more than 10us impulse 
-  delayMicroseconds(10);
-  digitalWrite(TP, LOW);
-  long microseconds = pulseIn(EP,HIGH);   // waits for the pin to go HIGH, and returns the length of the pulse in microseconds
-  return microseconds;                    // return microseconds
-}
-#endif
 
 #if WRITE_SD==1
 void reccord_sd(int capteur)
